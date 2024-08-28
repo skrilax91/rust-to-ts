@@ -12,7 +12,7 @@ pub struct Constant {
 pub fn find_all_public_constants(rust_src_path: PathBuf) -> Vec<Constant> {
     let files = get_all_files(rust_src_path, Some("rs".to_string()));
     let mut constants = Vec::new();
-    let regex = Regex::new(r#"pub const ([A-Z_0-9]+): &str =\s*".+";"#).unwrap();
+    let regex = Regex::new(r#"\s*pub const ([A-Z_0-9]+): &str =\s*".+";"#).unwrap();
 
     for file in files {
         let file_path = file.to_str().unwrap();
@@ -23,7 +23,8 @@ pub fn find_all_public_constants(rust_src_path: PathBuf) -> Vec<Constant> {
         for line in file.lines() {
             multiline_buffer.push_str(line);
 
-            if !multiline_buffer.starts_with("pub const") {
+
+            if !multiline_buffer.trim().trim_matches('\t').starts_with("pub const") {
                 multiline_buffer.clear();
                 continue;
             }
