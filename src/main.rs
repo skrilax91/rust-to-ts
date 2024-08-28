@@ -130,6 +130,38 @@ fn sync_project_version(rust_path: PathBuf, ts_path: PathBuf) {
     println!("Version updated to {}", rust_version);
 }
 
+/// Process optional types
+/// This function will process all optional types and change | undefined to ? in the typescript files
+///
+/// Example:
+///   let a: string | undefined; -> let a?: string;
+fn process_optionals(path: PathBuf) {
+    let files = get_all_files(path, Some("ts".to_string()));
+
+    for file in files {
+        let file_path = file.to_str().unwrap();
+        let file = std::fs::read_to_string(file_path).unwrap();
+
+        let mut buffer = Vec::new();
+
+        for line in file.lines() {
+            let line = line.trim();
+
+            if line.contains("| undefined") {
+                let before_separator = line.split(":").nth(0).unwrap();
+                let after_separator = line.split(":").nth(1).unwrap();
+                let after_separator = after_separator.replace(" | undefined", "");
+                writeln!(buffer, "{}?:{}", before_separator, after_separator).unwrap();
+            } else {
+                writeln!(buffer, "{}", line).unwrap();
+            }
+        }
+
+        let mut file = std::fs::File::create(file_path).unwrap();
+        file.write_all(&buffer).unwrap();
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
@@ -160,6 +192,7 @@ async fn main() {
     .await;
     process_enums(ts_src_path.join("generated-structs"));
     process_constants(rust_src_path, ts_src_path.clone());
+    process_optionals(ts_src_path.clone());
     generate_index(ts_src_path);
 
     sync_project_version(rust_full_path, ts_full_path.clone());
