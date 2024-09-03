@@ -140,25 +140,25 @@ fn process_optionals(path: PathBuf) {
 
     for file in files {
         let file_path = file.to_str().unwrap();
-        let file = std::fs::read_to_string(file_path).unwrap();
+        let mut file = std::fs::read_to_string(file_path).unwrap();
+        let mut mutated_file = file.clone();
 
-        let mut buffer = Vec::new();
+        // get all export types with regex
+        let regex = regex::Regex::new(r"([A-Za-z0-9]+):\s*([A-Za-z0-9]+\s*\|\s*undefined)").unwrap();
 
-        for line in file.lines() {
-            let line = line.trim();
+        let result = regex.captures_iter(&file);
 
-            if line.contains("| undefined") {
-                let before_separator = line.split(":").nth(0).unwrap();
-                let after_separator = line.split(":").nth(1).unwrap();
-                let after_separator = after_separator.replace(" | undefined", "");
-                writeln!(buffer, "{}?:{}", before_separator, after_separator).unwrap();
-            } else {
-                writeln!(buffer, "{}", line).unwrap();
-            }
+        for cap in result {
+            let name = cap.get(1).unwrap().as_str();
+            let mut value = cap.get(2).unwrap().as_str();
+
+            // replace name\s*:\s*value | undefined with name?: value
+            let new_line = format!("{}?: {}", name, value.replace(" | undefined", ""));
+            mutated_file = mutated_file.replace(cap.get(0).unwrap().as_str(), &new_line);
         }
 
         let mut file = std::fs::File::create(file_path).unwrap();
-        file.write_all(&buffer).unwrap();
+        file.write_all(mutated_file.as_bytes()).unwrap();
     }
 }
 
@@ -184,6 +184,12 @@ async fn main() {
 
     println!("Rust project path: {:?}", rust_full_path);
     println!("Typescript project path: {:?}", ts_full_path);
+
+    // remove the generated-structs directory
+    let generated_structs = ts_src_path.join("generated-structs");
+    if generated_structs.exists() {
+        std::fs::remove_dir_all(generated_structs).unwrap();
+    }
 
     execute_ts_rs(
         rust_full_path.clone(),
